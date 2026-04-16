@@ -22,6 +22,7 @@ chmod +x setup.sh start.sh
 ```
 
 ### Starting the Application
+
 Launch both backends and the frontend concurrently with a single command:
 
 ```bash
@@ -29,6 +30,7 @@ Launch both backends and the frontend concurrently with a single command:
 ```
 
 Once started:
+
 - **Frontend**: [http://localhost:3000](http://localhost:3000)
 - **Spring MVC Backend**: [http://localhost:8080](http://localhost:8080/actuator/health)
 - **Spring WebFlux Backend**: [http://localhost:8081](http://localhost:8081/actuator/health)
@@ -52,6 +54,7 @@ graph TD
 ```
 
 ### Key Technical Pillars
+
 - **Dual Runtime**: One API, two engines. Switchable at runtime with zero client changes.
 - **Enterprise Search**: Lucene-powered full-text search integrated via Hibernate Search.
 - **Strict Quality Gates**: 80%+ test coverage, mutation testing, and static analysis (PMD, Checkstyle).
@@ -67,18 +70,23 @@ For a deep dive into the architecture, design patterns, and technical justificat
 To ensure everything is working correctly, you can run the following test suites:
 
 ### Backend Tests (Java/JUnit)
+
 Runs all unit and integration tests (MVC, WebFlux, and Shared):
+
 ```bash
 ./gradlew test
 ```
 
 ### Frontend Tests (Jest/React)
+
 Runs the React test suite with MSW network interception:
+
 ```bash
 cd frontend && npm test
 ```
 
 ### Quality & Security Scans
+
 ```bash
 ./gradlew check            # Checkstyle, PMD, SpotBugs, JaCoCo
 ./gradlew dependencyCheckAnalyze  # OWASP CVE Scan
@@ -92,5 +100,3 @@ cd frontend && npm test
 - **[AI_USAGE.md](./AI_USAGE.md)**: Detailed documentation of AI collaboration and human-in-the-loop decisions.
 
 ---
-
-*This project is submitted as part of the Allica Bank Technical Assessment.*
