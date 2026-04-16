@@ -1,0 +1,246 @@
+/**
+ * backend-webflux build pipeline — same as backend-mvc, WebFlux-specific deps.
+ * See backend-mvc/build.gradle for full documentation of each plugin.
+ */
+
+plugins {
+    id 'java'
+    id 'org.springframework.boot'        version '3.2.4'
+    id 'io.spring.dependency-management' version '1.1.4'
+    id 'checkstyle'
+    id 'pmd'
+    id 'com.github.spotbugs'             version '6.0.9'
+    id 'com.diffplug.spotless'           version '6.25.0'
+    id 'jacoco'
+    id 'info.solidsoft.pitest'           version '1.15.0'
+    id 'org.owasp.dependencycheck'       version '9.0.9'
+    id 'org.sonarqube'                   version '4.4.1.3373'
+    id 'com.github.ben-manes.versions'  version '0.51.0'
+    id 'com.google.cloud.tools.jib'      version '3.4.2'
+    id 'org.cyclonedx.bom'              version '1.8.2'
+}
+
+group   = 'com.allicatest'
+version = '1.0.0'
+
+java { sourceCompatibility = JavaVersion.VERSION_21 }
+
+configurations { compileOnly { extendsFrom annotationProcessor } }
+
+repositories { mavenCentral() }
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-webflux'
+    implementation 'org.springframework.boot:spring-boot-starter-data-r2dbc'
+    implementation 'io.r2dbc:r2dbc-h2'
+    runtimeOnly    'com.h2database:h2'
+    runtimeOnly    'org.postgresql:postgresql'
+    implementation 'org.postgresql:r2dbc-postgresql'
+    implementation 'org.flywaydb:flyway-core'
+    implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.security:spring-security-oauth2-resource-server'
+    implementation 'org.springframework.security:spring-security-oauth2-jose'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    compileOnly    'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'io.projectreactor:reactor-test'
+    testImplementation 'org.springframework.security:spring-security-test'
+    testImplementation 'org.mockito:mockito-core'
+    testImplementation 'org.mockito:mockito-junit-jupiter'
+}
+
+dependencies {
+    constraints {
+        implementation('org.springframework.boot:spring-boot-starter-webflux') {
+            version { require '3.2.0' }
+            because 'Minimum supported Spring Boot version'
+        }
+    }
+}
+
+// ─── Unit vs integration test split ──────────────────────────────────────────
+test {
+    useJUnitPlatform()
+    filter { excludeTestsMatching '*IntegrationTest' }
+    finalizedBy jacocoTestReport
+}
+
+tasks.register('integrationTest', Test) {
+    description = 'Runs Spring WebFlux context integration tests'
+    group       = 'verification'
+    useJUnitPlatform()
+    filter { includeTestsMatching '*IntegrationTest' }
+    shouldRunAfter test
+    finalizedBy jacocoTestReport
+    environment 'SPRING_PROFILES_ACTIVE', 'test'
+}
+
+// ─── JaCoCo ──────────────────────────────────────────────────────────────────
+jacoco { toolVersion = '0.8.11' }
+
+jacocoTestReport {
+    dependsOn test, integrationTest
+    reports { xml.required = true; html.required = true }
+    afterEvaluate {
+        classDirectories.setFrom(files(classDirectories.files.collect {
+            fileTree(dir: it, excludes: [
+                '**/*Application*', '**/exception/**',
+                '**/*Config*', '**/db/migration/**',
+            ])
+        }))
+    }
+}
+
+jacocoTestCoverageVerification {
+    dependsOn jacocoTestReport
+    violationRules { rule { limit { minimum = 0.80 } } }
+}
+
+// ─── Checkstyle ──────────────────────────────────────────────────────────────
+checkstyle {
+    toolVersion      = '10.14.2'
+    configFile       = file("${rootDir}/config/checkstyle/checkstyle.xml")
+    configDirectory  = file("${rootDir}/config/checkstyle")
+    maxWarnings      = 0
+    ignoreFailures   = true
+}
+checkstyleTest.enabled = false
+
+// ─── Spotless ────────────────────────────────────────────────────────────────
+spotless {
+    java {
+        palantirJavaFormat('2.39.0')
+        importOrder('java', 'javax', 'jakarta', 'org', 'com', '')
+        removeUnusedImports()
+        trimTrailingWhitespace()
+        endWithNewline()
+        targetExclude '**/generated/**', '**/build/**'
+    }
+}
+
+// ─── PMD ─────────────────────────────────────────────────────────────────────
+pmd {
+    toolVersion    = '7.0.0'
+    ruleSetFiles   = files("${rootDir}/config/pmd/ruleset.xml")
+    ruleSets       = []
+    consoleOutput  = true
+    ignoreFailures = true
+}
+pmdTest.enabled = false
+
+// ─── SpotBugs ────────────────────────────────────────────────────────────────
+spotbugs {
+    toolVersion    = '4.8.3'
+    excludeFilter  = file("${rootDir}/config/spotbugs/exclude.xml")
+    ignoreFailures = true
+}
+spotbugsTest.enabled = false
+
+tasks.withType(com.github.spotbugs.snom.SpotBugsTask).configureEach {
+    reports {
+        xml  { required = false }
+        html { required = true; stylesheet = 'fancy-hist.xsl' }
+    }
+}
+
+// ─── PITest ──────────────────────────────────────────────────────────────────
+pitest {
+    targetClasses       = ['com.allicatest.webflux.*']
+    targetTests         = ['com.allicatest.webflux.*']
+    mutators            = ['DEFAULTS']
+    outputFormats       = ['XML', 'HTML']
+    timestampedReports  = false
+    mutationThreshold   = 70
+    coverageThreshold   = 80
+    failWhenNoMutations = false
+    junit5PluginVersion = '1.2.1'
+    threads             = 4
+    excludedClasses     = ['*Application', '*Config', '*Exception', '*DTO']
+    excludedMethods     = ['main', 'equals', 'hashCode', 'toString']
+}
+
+// ─── OWASP ───────────────────────────────────────────────────────────────────
+dependencyCheck {
+    failBuildOnCVSS = 7
+    formats         = ['HTML', 'XML']
+    suppressionFile = 'owasp-suppressions.xml'
+    analyzers { assemblyEnabled = false; nuspecEnabled = false }
+}
+
+// ─── Dependency updates ───────────────────────────────────────────────────────
+def isNonStable = { String version ->
+    def stableKeyword = ['RELEASE', 'FINAL', 'GA'].any { it -> version.toUpperCase().contains(it) }
+    def regex = /^[0-9,.v-]+(-r)?$/
+    return !stableKeyword && !(version ==~ regex)
+}
+
+dependencyUpdates {
+    rejectVersionIf { isNonStable(it.candidate.version) }
+    outputFormatter = 'json,html'
+    outputDir       = 'build/reports/dependencyUpdates'
+}
+
+// ─── SonarQube ───────────────────────────────────────────────────────────────
+sonar {
+    properties {
+        property 'sonar.projectKey',   'allica-test-webflux'
+        property 'sonar.projectName',  'Allica Test — Spring WebFlux'
+        property 'sonar.java.source',  '21'
+        property 'sonar.coverage.jacoco.xmlReportPaths',
+                 'build/reports/jacoco/test/jacocoTestReport.xml'
+        property 'sonar.junit.reportPaths', 'build/test-results/test'
+        property 'sonar.exclusions',
+                 '**/exception/**,**/*Application*,**/db/migration/**'
+    }
+}
+
+// ─── Jib ─────────────────────────────────────────────────────────────────────
+jib {
+    from { image = 'eclipse-temurin:21-jre-alpine' }
+    to {
+        image = "ghcr.io/${System.getenv('GITHUB_REPOSITORY') ?: 'allicatest/allica-test'}/allica-test-webflux"
+        tags  = ['latest', System.getenv('GITHUB_SHA')?.take(7) ?: 'dev']
+        auth {
+            username = System.getenv('GITHUB_ACTOR') ?: ''
+            password = System.getenv('GITHUB_TOKEN') ?: ''
+        }
+    }
+    container {
+        mainClass    = 'com.allicatest.webflux.AllicaTestWebFluxApplication'
+        ports        = ['8081']
+        jvmFlags     = [
+            '-XX:+UseContainerSupport',
+            '-XX:MaxRAMPercentage=75.0',
+            '-XX:+UseG1GC',
+            '-Djava.security.egd=file:/dev/./urandom',
+        ]
+        environment  = [SPRING_PROFILES_ACTIVE: 'prod']
+        creationTime = 'USE_CURRENT_TIMESTAMP'
+        user         = '1000'
+    }
+}
+
+// ─── CycloneDX SBOM ──────────────────────────────────────────────────────────
+cyclonedxBom {
+    includeConfigs     = ['runtimeClasspath']
+    destination        = file('build/reports/sbom')
+    outputName         = 'sbom'
+    outputFormat       = 'json'
+    includeLicenseText = false
+    componentVersion   = version
+}
+
+// ─── Task wiring ─────────────────────────────────────────────────────────────
+check.dependsOn(
+    checkstyleMain, spotlessCheck, pmdMain,
+    spotbugsMain, jacocoTestCoverageVerification,
+)
+
+tasks.register('qualityGate') {
+    description = 'Runs all quality checks: style, analysis, tests, coverage'
+    group       = 'verification'
+    dependsOn check, integrationTest
+}

@@ -1,0 +1,3 @@
+rootProject.name = 'allica-test'
+include('backend-mvc')
+include('backend-webflux')

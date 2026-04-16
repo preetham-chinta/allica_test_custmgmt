@@ -1,0 +1,62 @@
+services:
+
+  # ── Spring MVC resource server (port 8080) ────────────────────────────────
+  backend-mvc:
+    build: { context: .., dockerfile: docker/Dockerfile.mvc }
+    container_name: allica-mvc
+    ports: ["8080:8080"]
+    environment: { SPRING_PROFILES_ACTIVE: dev }
+    healthcheck:
+      test: ["CMD","wget","-qO-","http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+    networks: [allica]
+
+  # ── Spring WebFlux resource server (port 8081) ────────────────────────────
+  backend-webflux:
+    build: { context: .., dockerfile: docker/Dockerfile.webflux }
+    container_name: allica-webflux
+    ports: ["8081:8081"]
+    environment: { SPRING_PROFILES_ACTIVE: dev }
+    healthcheck:
+      test: ["CMD","wget","-qO-","http://localhost:8081/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+    networks: [allica]
+
+  # ── React frontend (port 3000) ────────────────────────────────────────────
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.frontend
+      args: { ACTIVE_BACKEND: mvc }
+    container_name: allica-frontend
+    ports: ["3000:3000"]
+    depends_on:
+      backend-mvc: { condition: service_healthy }
+    networks: [allica]
+
+networks:
+  allica:
+    driver: bridge
+
+# ── Quick reference ──────────────────────────────────────────────────────────
+#
+# Start everything:
+#   docker compose -f docker/docker-compose.yml up
+#
+# Run individually (recommended for demo — show both backends side by side):
+#   ./gradlew :backend-mvc:bootRun     --args='--spring.profiles.active=dev'
+#   ./gradlew :backend-webflux:bootRun --args='--spring.profiles.active=dev'
+#   cd frontend && npm install && ACTIVE_BACKEND=mvc npm run dev
+#
+# Switch frontend to WebFlux at dev runtime:
+#   ACTIVE_BACKEND=webflux npm run dev
+#
+# BFF (production auth pattern):
+#   Use Next.js API routes + NextAuth.js — see README for details.
+#   A separate Spring Boot BFF is not required when Next.js is the frontend.

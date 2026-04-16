@@ -1,0 +1,59 @@
+/*
+ * index.css — layout and shell only.
+ *
+ * MUI handles all component styles (buttons, inputs, table, chips)
+ * via the theme in src/components/ui/theme.js.
+ *
+ * This file is responsible for:
+ *   - App shell layout (sticky header, flex column, footer at bottom)
+ *   - Content width constraint and padding
+ *   - Dark mode background (MUI CssBaseline handles text/surface colours)
+ *   - Mark element (search highlight) — not a MUI concern
+ */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  /* MUI CssBaseline sets font-family, font-size, line-height, color */
+  background-color: #f4f6f9;
+  -webkit-font-smoothing: antialiased;
+}
+
+@media (prefers-color-scheme: dark) {
+  body { background-color: #0f172a; }
+}
+
+/* ── App shell ────────────────────────────────────────────────────────────── */
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-main {
+  flex: 1;
+  padding: 32px 24px 48px;
+}
+
+.content-wrapper {
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+/* ── Search highlight ─────────────────────────────────────────────────────── */
+mark {
+  background: #fde047;
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+/* ── MUI overrides that can't live in the theme ──────────────────────────── */
+
+/* Ensure the sticky AppBar sits above MUI Popper / Menu overlays */
+.MuiAppBar-root { z-index: 1200 !important; }
+
+/* Smooth table opacity transition for isStale dimming */
+.MuiTableContainer-root { transition: opacity 0.2s ease; }

@@ -1,0 +1,147 @@
+<?xml version="1.0"?>
+<!DOCTYPE module PUBLIC
+    "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
+    "https://checkstyle.org/dtds/configuration_1_3.dtd">
+
+<!--
+  Checkstyle configuration — Google Java Style with Spring/Lombok relaxations.
+
+  Full Google Style: https://google.github.io/styleguide/javaguide.html
+  Relaxations made here:
+    - Line length 120 chars (Google says 100, but Spring code is verbose)
+    - Javadoc not required on every method (Spring annotations are self-documenting)
+    - Allow @SuppressWarnings (needed for Lombok, Spring, and serialisation)
+    - Method length up to 60 lines (Spring controller methods can be long)
+    - Class/file length up to 500 lines
+
+  Suppressions file handles per-file exclusions (generated code, config classes).
+-->
+<module name="Checker">
+    <property name="charset" value="UTF-8"/>
+    <property name="severity" value="error"/>
+    <property name="fileExtensions" value="java"/>
+
+    <!-- ── File-level ─────────────────────────────────────────────────────── -->
+    <module name="FileTabCharacter">
+        <property name="eachLine" value="true"/>
+    </module>
+    <module name="NewlineAtEndOfFile"/>
+    <module name="FileLength">
+        <property name="max" value="500"/>
+    </module>
+
+    <!-- Line length (Checker child in modern versions) -->
+    <module name="LineLength">
+        <property name="max" value="120"/>
+        <property name="ignorePattern" value="^package.*|^import.*|a href|href|http://|https://|ftp://"/>
+    </module>
+
+    <!-- Suppressions file for per-file/per-check exclusions -->
+    <module name="SuppressionFilter">
+        <property name="file" value="${config_loc}/suppressions.xml"/>
+        <property name="optional" value="false"/>
+    </module>
+
+    <module name="TreeWalker">
+
+        <!-- ── Imports ──────────────────────────────────────────────────── -->
+        <module name="AvoidStarImport"/>
+        <module name="UnusedImports"/>
+        <module name="RedundantImport"/>
+        <module name="IllegalImport">
+            <!-- Prevent mixing Guava and JDK equivalents -->
+            <property name="illegalPkgs" value="sun, com.sun"/>
+        </module>
+        <module name="ImportOrder">
+            <property name="groups" value="java,javax,jakarta,org,com"/>
+            <property name="ordered" value="true"/>
+            <property name="separated" value="true"/>
+            <property name="option" value="above"/>
+        </module>
+
+        <!-- ── Naming ────────────────────────────────────────────────────── -->
+        <module name="ClassTypeParameterName">
+            <property name="format" value="(^[A-Z][0-9]?)$|([A-Z][a-zA-Z0-9]*[T]$)"/>
+        </module>
+        <module name="InterfaceTypeParameterName">
+            <property name="format" value="(^[A-Z][0-9]?)$|([A-Z][a-zA-Z0-9]*[T]$)"/>
+        </module>
+        <module name="MethodTypeParameterName">
+            <property name="format" value="(^[A-Z][0-9]?)$|([A-Z][a-zA-Z0-9]*[T]$)"/>
+        </module>
+        <module name="PackageName">
+            <property name="format" value="^[a-z]+(\.[a-z][a-z0-9]*)*$"/>
+        </module>
+        <module name="TypeName"/>
+        <module name="MethodName"/>
+        <module name="ParameterName">
+            <property name="format" value="^[a-z]([a-z0-9][a-zA-Z0-9]*)?$"/>
+        </module>
+        <module name="LocalVariableName">
+            <property name="format" value="^[a-z]([a-z0-9][a-zA-Z0-9]*)?$"/>
+        </module>
+        <module name="MemberName">
+            <property name="format" value="^[a-z][a-z0-9][a-zA-Z0-9]*$|^[a-z]$"/>
+        </module>
+        <module name="ConstantName"/>
+
+
+        <!-- ── Whitespace ────────────────────────────────────────────────── -->
+        <module name="WhitespaceAround">
+            <property name="allowEmptyConstructors" value="true"/>
+            <property name="allowEmptyLambdas" value="true"/>
+            <property name="allowEmptyMethods" value="true"/>
+            <property name="allowEmptyTypes" value="true"/>
+            <property name="allowEmptyLoops" value="true"/>
+        </module>
+        <module name="WhitespaceAfter"/>
+        <module name="NoWhitespaceBefore"/>
+        <module name="GenericWhitespace"/>
+        <module name="MethodParamPad"/>
+        <module name="ParenPad"/>
+        <module name="EmptyLineSeparator">
+            <property name="allowNoEmptyLineBetweenFields" value="true"/>
+            <property name="allowMultipleEmptyLines" value="false"/>
+        </module>
+        <module name="TrailingComment"/>
+
+        <!-- ── Braces ────────────────────────────────────────────────────── -->
+        <module name="LeftCurly"/>
+        <module name="RightCurly"/>
+        <module name="NeedBraces">
+            <property name="tokens" value="LITERAL_DO, LITERAL_ELSE, LITERAL_FOR,
+                                           LITERAL_IF, LITERAL_WHILE"/>
+        </module>
+
+        <!-- ── Coding style ──────────────────────────────────────────────── -->
+        <module name="OneStatementPerLine"/>
+        <module name="MultipleVariableDeclarations"/>
+        <module name="ArrayTypeStyle"/>
+        <module name="FallThrough"/>
+        <module name="UpperEll"/>
+        <module name="ModifierOrder"/>
+        <module name="EmptyCatchBlock">
+            <property name="exceptionVariableName" value="expected|ignore|ignored"/>
+        </module>
+
+        <!-- ── Design ────────────────────────────────────────────────────── -->
+        <module name="MethodLength">
+            <property name="max" value="60"/>
+            <property name="countEmpty" value="false"/>
+        </module>
+        <module name="ParameterNumber">
+            <property name="max" value="8"/>
+        </module>
+
+        <!-- ── Error prone ───────────────────────────────────────────────── -->
+        <module name="EqualsHashCode"/>
+        <module name="StringLiteralEquality"/>
+        <module name="DefaultComesLast"/>
+        <module name="SimplifyBooleanExpression"/>
+        <module name="SimplifyBooleanReturn"/>
+        <module name="NestedIfDepth">
+            <property name="max" value="3"/>
+        </module>
+
+    </module>
+</module>

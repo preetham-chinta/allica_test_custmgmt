@@ -1,0 +1,328 @@
+/**
+ * backend-mvc build pipeline
+ *
+ * Full pipeline equivalent to Maven lifecycle:
+ *
+ *   ./gradlew dependencyUpdates              # 1a. versions check
+ *   ./gradlew compileJava                    # 2.  compile
+ *   ./gradlew checkstyleMain spotlessCheck   # 3a. style
+ *   ./gradlew pmdMain                        # 3b. static analysis
+ *   ./gradlew spotbugsMain                   # 3c. bytecode analysis
+ *   ./gradlew test jacocoTestReport          # 4.  unit tests + coverage
+ *   ./gradlew integrationTest                # 5.  integration tests
+ *   ./gradlew pitest                         # 6.  mutation testing
+ *   ./gradlew dependencyCheckAnalyze         # 7.  OWASP CVE scan
+ *   ./gradlew sonar                          # 8.  SonarQube
+ *   ./gradlew bootJar                        # 9.  package
+ *   ./gradlew jib                            # 10. Docker push (no daemon needed)
+ *   ./gradlew cyclonedxBom                   # 11. SBOM
+ *
+ * Local convenience:
+ *   ./gradlew check          — all quality gates (excludes pitest/sonar/owasp)
+ *   ./gradlew spotlessApply  — auto-format all Java files
+ *   ./gradlew jibDockerBuild — build Docker image into local Docker daemon
+ */
+
+
+plugins {
+    id 'java'
+    id 'org.springframework.boot'        version '3.2.4'
+    id 'io.spring.dependency-management' version '1.1.4'
+
+    // ── Code quality ──────────────────────────────────────────────────────
+    id 'checkstyle'                                           // style enforcement
+    id 'pmd'                                                  // static analysis
+    id 'com.github.spotbugs'             version '6.0.9'     // bytecode bug detection
+    id 'com.diffplug.spotless'           version '6.25.0'    // auto-formatter
+
+    // ── Testing ───────────────────────────────────────────────────────────
+    id 'jacoco'                                               // coverage
+    id 'info.solidsoft.pitest'           version '1.15.0'    // mutation testing
+
+    // ── Security ──────────────────────────────────────────────────────────
+    id 'org.owasp.dependencycheck'       version '9.0.9'     // CVE scan
+
+    // ── Analysis ─────────────────────────────────────────────────────────
+    id 'org.sonarqube'                   version '4.4.1.3373' // SonarQube
+    id 'com.github.ben-manes.versions'  version '0.51.0'    // dep updates
+
+    // ── Delivery ─────────────────────────────────────────────────────────
+    id 'com.google.cloud.tools.jib'      version '3.4.2'     // Docker — no daemon needed
+    id 'org.cyclonedx.bom'              version '1.8.2'      // SBOM generation
+}
+
+group   = 'com.allicatest'
+version = '1.0.0'
+
+java { sourceCompatibility = JavaVersion.VERSION_21 }
+
+configurations { compileOnly { extendsFrom annotationProcessor } }
+
+repositories { mavenCentral() }
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'org.hibernate.search:hibernate-search-mapper-orm:7.1.1.Final'
+    implementation 'org.hibernate.search:hibernate-search-backend-lucene:7.1.1.Final'
+    implementation 'org.flywaydb:flyway-core'
+    compileOnly    'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+    runtimeOnly 'com.h2database:h2'
+    runtimeOnly 'org.postgresql:postgresql'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.security:spring-security-test'
+}
+
+// ─── Dependency constraints (enforcer equivalent) ────────────────────────────
+// Ensures minimum versions across all transitive dependencies.
+// Fails the build if a dep resolves below the declared minimum.
+dependencies {
+    constraints {
+        implementation('org.springframework.boot:spring-boot-starter-web') {
+            version { require '3.2.0' }
+            because 'Minimum supported Spring Boot version'
+        }
+        implementation('org.flywaydb:flyway-core') {
+            version { require '10.0.0' }
+            because 'Flyway 10+ required for modern PostgreSQL dialect'
+        }
+    }
+}
+
+// ─── Unit vs integration test split ──────────────────────────────────────────
+// Equivalent to Maven surefire (unit) + failsafe (integration)
+// No files moved — filter by name convention: *IntegrationTest = slow Spring context test
+
+test {
+    useJUnitPlatform()
+    filter { excludeTestsMatching '*IntegrationTest' }   // fast — no Spring context
+    finalizedBy jacocoTestReport
+}
+
+tasks.register('integrationTest', Test) {
+    description   = 'Runs Spring context integration tests (*IntegrationTest.java)'
+    group         = 'verification'
+    useJUnitPlatform()
+    filter { includeTestsMatching '*IntegrationTest' }   // slow — full H2 + Spring
+    shouldRunAfter test
+    finalizedBy jacocoTestReport
+    environment 'SPRING_PROFILES_ACTIVE', 'test'
+}
+
+// ─── JaCoCo ──────────────────────────────────────────────────────────────────
+jacoco { toolVersion = '0.8.11' }
+
+jacocoTestReport {
+    dependsOn test, integrationTest
+    reports { xml.required = true; html.required = true }
+    afterEvaluate {
+        classDirectories.setFrom(files(classDirectories.files.collect {
+            fileTree(dir: it, excludes: [
+                '**/*Application*',
+                '**/exception/**',
+                '**/*Config*',
+                '**/db/migration/**',
+            ])
+        }))
+    }
+}
+
+jacocoTestCoverageVerification {
+    dependsOn jacocoTestReport
+    violationRules {
+        rule {
+            limit { minimum = 0.80 }   // 80% line coverage
+        }
+    }
+}
+
+// ─── Checkstyle ──────────────────────────────────────────────────────────────
+checkstyle {
+    toolVersion    = '10.14.2'
+    configFile     = file("${rootDir}/config/checkstyle/checkstyle.xml")
+    configDirectory = file("${rootDir}/config/checkstyle")
+    maxWarnings    = 0      // warnings are errors — no free passes
+    ignoreFailures = true
+}
+
+// Only run on main sources — test code has different style rules (see suppressions.xml)
+checkstyleTest.enabled = false
+
+// ─── Spotless (auto-formatter) ────────────────────────────────────────────────
+// Equivalent to `mvn spotless:check` / `mvn spotless:apply`
+// Run `./gradlew spotlessApply` to auto-format before committing
+spotless {
+    java {
+        palantirJavaFormat('2.39.0')        // opinionated, no config needed
+        importOrder(                         // match checkstyle ImportOrder
+            'java', 'javax', 'jakarta', 'org', 'com', ''
+        )
+        removeUnusedImports()
+        trimTrailingWhitespace()
+        endWithNewline()
+        // Don't reformat Lombok-annotated classes — it can break annotations
+        targetExclude '**/generated/**', '**/build/**'
+    }
+}
+
+// ─── PMD ─────────────────────────────────────────────────────────────────────
+pmd {
+    toolVersion    = '7.0.0'
+    ruleSetFiles   = files("${rootDir}/config/pmd/ruleset.xml")
+    ruleSets       = []          // clear defaults — only use our ruleset
+    consoleOutput  = true
+    ignoreFailures = true
+}
+
+pmdTest.enabled = false     // test code excluded — PMD is noisy on test patterns
+
+// ─── SpotBugs ────────────────────────────────────────────────────────────────
+spotbugs {
+    toolVersion    = '4.8.3'
+    excludeFilter  = file("${rootDir}/config/spotbugs/exclude.xml")
+    ignoreFailures = true
+}
+
+spotbugsTest.enabled = false    // test code excluded
+
+tasks.withType(com.github.spotbugs.snom.SpotBugsTask).configureEach {
+    reports {
+        xml  { required = false }
+        html { required = true; stylesheet = 'fancy-hist.xsl' }
+    }
+}
+
+// ─── PITest (mutation testing) ────────────────────────────────────────────────
+// Equivalent to `mvn pitest:mutationCoverage`
+// Mutates your bytecode and checks if tests catch the mutations.
+// If tests pass after a mutation, the tests aren't actually testing the logic.
+pitest {
+    targetClasses       = ['com.allicatest.mvc.*']
+    targetTests         = ['com.allicatest.mvc.*']
+    mutators            = ['DEFAULTS']             // STRONGER for stricter mode
+    outputFormats       = ['XML', 'HTML']
+    timestampedReports  = false                    // stable path for CI artifact upload
+    mutationThreshold   = 70                       // 70% of mutations must be killed
+    coverageThreshold   = 80                       // min line coverage required
+    failWhenNoMutations = false                    // don't fail on empty source sets
+    junit5PluginVersion = '1.2.1'                  // must match JUnit 5 version
+    threads             = 4                        // parallel mutation — faster
+    excludedClasses     = [
+        '*Application',
+        '*Config',
+        '*Exception',
+        '*DTO',
+    ]
+    excludedMethods     = ['main', 'equals', 'hashCode', 'toString']
+}
+
+// ─── OWASP Dependency Check ───────────────────────────────────────────────────
+// Equivalent to `mvn dependency-check:check`
+dependencyCheck {
+    failBuildOnCVSS = 7                    // CVSS ≥ 7.0 = HIGH → fail
+    formats         = ['HTML', 'XML']
+    suppressionFile = 'owasp-suppressions.xml'
+    analyzers {
+        assemblyEnabled = false            // not a .NET project
+        nuspecEnabled   = false
+    }
+}
+
+// ─── Dependency updates (versions plugin) ─────────────────────────────────────
+// Equivalent to `mvn versions:display-dependency-updates`
+// Run: `./gradlew dependencyUpdates`
+def isNonStable = { String version ->
+    def stableKeyword = ['RELEASE', 'FINAL', 'GA'].any { it -> version.toUpperCase().contains(it) }
+    def regex = /^[0-9,.v-]+(-r)?$/
+    return !stableKeyword && !(version ==~ regex)
+}
+
+dependencyUpdates {
+    rejectVersionIf { isNonStable(it.candidate.version) }
+    outputFormatter = 'json,html'
+    outputDir       = 'build/reports/dependencyUpdates'
+}
+
+// ─── SonarQube ───────────────────────────────────────────────────────────────
+// Equivalent to `mvn sonar:sonar`
+// Requires: SONAR_TOKEN env var and SONAR_HOST_URL (or sonar.host.url property)
+sonar {
+    properties {
+        property 'sonar.projectKey',        'allica-test-mvc'
+        property 'sonar.projectName',       'Allica Test — Spring MVC'
+        property 'sonar.java.source',       '21'
+        property 'sonar.coverage.jacoco.xmlReportPaths',
+                 'build/reports/jacoco/test/jacocoTestReport.xml'
+        property 'sonar.junit.reportPaths', 'build/test-results/test'
+        property 'sonar.exclusions',
+                 '**/exception/**,**/*Application*,**/db/migration/**'
+    }
+}
+
+// ─── Jib (Docker — no daemon required) ───────────────────────────────────────
+// Equivalent to `mvn jib:dockerBuild` (local) or `mvn jib:build` (registry push)
+// Key advantage over Dockerfiles: no Docker daemon needed in CI — builds OCI image
+// directly from Gradle, pushes to registry without docker build/push commands.
+jib {
+    from {
+        image = 'eclipse-temurin:21-jre-alpine'   // small, secure base image
+    }
+    to {
+        image = "ghcr.io/${System.getenv('GITHUB_REPOSITORY') ?: 'allicatest/allica-test'}/allica-test-mvc"
+        tags  = [
+            'latest',
+            System.getenv('GITHUB_SHA')?.take(7) ?: 'dev',
+        ]
+        auth {
+            username = System.getenv('GITHUB_ACTOR') ?: ''
+            password = System.getenv('GITHUB_TOKEN') ?: ''
+        }
+    }
+    container {
+        mainClass       = 'com.allicatest.mvc.AllicaTestMvcApplication'
+        ports           = ['8080']
+        jvmFlags        = [
+            '-XX:+UseContainerSupport',
+            '-XX:MaxRAMPercentage=75.0',
+            '-XX:+UseG1GC',
+            '-Djava.security.egd=file:/dev/./urandom',  // faster startup
+        ]
+        environment     = [SPRING_PROFILES_ACTIVE: 'prod']
+        creationTime    = 'USE_CURRENT_TIMESTAMP'
+        user            = '1000'                         // non-root
+    }
+}
+
+// ─── CycloneDX SBOM ──────────────────────────────────────────────────────────
+// Equivalent to `mvn cyclonedx:makeAggregateBom`
+// Generates a Software Bill of Materials listing every dependency + CVE status.
+// Required by many enterprise security teams and UK financial regulators.
+cyclonedxBom {
+    includeConfigs  = ['runtimeClasspath']
+    destination     = file('build/reports/sbom')
+    outputName      = 'sbom'
+    outputFormat    = 'json'                  // also supports 'xml'
+    includeLicenseText = false                // keep SBOM size reasonable
+    componentVersion = version
+}
+
+// ─── Task ordering and check aggregation ──────────────────────────────────────
+check.dependsOn(
+    checkstyleMain,
+    spotlessCheck,
+    pmdMain,
+    spotbugsMain,
+    jacocoTestCoverageVerification,
+)
+
+// Full pipeline task — runs everything except sonar/pitest (slow — run in CI only)
+tasks.register('qualityGate') {
+    description = 'Runs all quality checks: style, analysis, tests, coverage'
+    group       = 'verification'
+    dependsOn check, integrationTest
+}

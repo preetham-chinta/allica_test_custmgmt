@@ -1,0 +1,22 @@
+# Stage 1: Build
+FROM eclipse-temurin:21-jdk-alpine AS builder
+WORKDIR /workspace
+COPY gradlew .
+COPY gradle/ gradle/
+COPY settings.gradle .
+COPY backend-mvc/build.gradle backend-mvc/
+RUN chmod +x gradlew && ./gradlew :backend-mvc:dependencies --no-daemon 2>/dev/null || true
+COPY backend-mvc/src backend-mvc/src
+RUN ./gradlew :backend-mvc:bootJar -x test --no-daemon
+
+# Stage 2: Run
+FROM eclipse-temurin:21-jre-alpine
+RUN addgroup -S app && adduser -S app -G app
+USER app:app
+WORKDIR /app
+COPY --from=builder /workspace/backend-mvc/build/libs/*.jar app.jar
+ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UseG1GC"
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD wget -qO- http://localhost:8080/actuator/health | grep -q '"status":"UP"' || exit 1
+ENTRYPOINT ["sh","-c","java $JAVA_OPTS -jar app.jar"]

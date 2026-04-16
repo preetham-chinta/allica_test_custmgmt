@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter
+    xmlns="https://github.com/spotbugs/filter/3.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="https://github.com/spotbugs/filter/3.0.0
+        https://raw.githubusercontent.com/spotbugs/spotbugs/master/spotbugs/etc/findbugsfilter.xsd">
+
+    <!--
+      SpotBugs exclusions — suppress false positives from:
+        1. Lombok-generated code (constructors, builders, getters)
+        2. Spring Boot auto-generated proxy classes
+        3. Spring Security filter chain (null checks not needed)
+        4. Flyway migration scripts
+        5. Test code (some patterns are intentional in tests)
+
+      SpotBugs bug categories:
+        BAD_PRACTICE   — general violations
+        CORRECTNESS    — likely bugs
+        MT_CORRECTNESS — multi-threading issues
+        PERFORMANCE    — performance bugs
+        SECURITY       — security vulnerabilities (rarely suppress these)
+        STYLE          — style issues
+    -->
+
+    <!-- ── Lombok ────────────────────────────────────────────────────────── -->
+    <!--
+      Lombok generates bytecode that SpotBugs misreads.
+      @Builder generates a static inner class — SpotBugs flags field initialisation.
+      @Data generates equals() that SpotBugs thinks should be final.
+    -->
+    <Match>
+        <Bug pattern="EQ_DOESNT_OVERRIDE_EQUALS"/>
+        <Or>
+            <Class name="~.*\..*Builder"/>
+            <Annotation name="lombok.Data"/>
+            <Annotation name="lombok.Value"/>
+            <Annotation name="lombok.Builder"/>
+            <Annotation name="lombok.AllArgsConstructor"/>
+            <Annotation name="lombok.NoArgsConstructor"/>
+        </Or>
+    </Match>
+
+    <!-- Lombok @SneakyThrows — SpotBugs flags thrown checked exceptions -->
+    <Match>
+        <Bug pattern="BC_UNCONFIRMED_CAST_OF_RETURN_VALUE"/>
+        <Annotation name="lombok.SneakyThrows"/>
+    </Match>
+
+    <!-- ── Spring Boot ───────────────────────────────────────────────────── -->
+    <!--
+      Spring Security FilterChain builds are null-safe by construction.
+      SpotBugs doesn't see the Spring Security annotations.
+    -->
+    <Match>
+        <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"/>
+        <Or>
+            <Class name="~.*SecurityConfig"/>
+            <Class name="~.*Config"/>
+        </Or>
+    </Match>
+
+    <!--
+      Spring @Autowired fields are null before injection but SpotBugs doesn't know.
+      We don't use @Autowired on fields (constructor injection instead) but
+      suppress in case any Spring Boot auto-configured classes trigger this.
+    -->
+    <Match>
+        <Bug pattern="UWF_UNWRITTEN_FIELD,UWF_UNWRITTEN_PUBLIC_OR_PROTECTED_FIELD"/>
+        <Class name="~.*Application"/>
+    </Match>
+
+    <!-- ── Application entry point ───────────────────────────────────────── -->
+    <Match>
+        <Class name="~.*Application"/>
+        <Bug pattern="UWF_UNWRITTEN_FIELD"/>
+    </Match>
+
+    <!-- ── DTOs / Records ────────────────────────────────────────────────── -->
+    <!--
+      Java Records with serialisation — SpotBugs flags serialVersionUID.
+      Records are sealed and implicitly final — no subclass can change serialisation.
+    -->
+    <Match>
+        <Bug pattern="SE_NO_SERIALVERSIONID"/>
+        <Or>
+            <Class name="~.*DTO.*"/>
+            <Class name="~.*Request"/>
+            <Class name="~.*Response"/>
+        </Or>
+    </Match>
+
+    <!-- ── Test code ─────────────────────────────────────────────────────── -->
+    <!--
+      Test classes intentionally throw exceptions, use hardcoded URLs, etc.
+    -->
+    <Match>
+        <Class name="~.*Test"/>
+        <Bug pattern="DMI_HARDCODED_ABSOLUTE_FILENAME,
+                      HardCodedStringLiteral,
+                      UPM_UNCALLED_PRIVATE_METHOD"/>
+    </Match>
+
+    <Match>
+        <Class name="~.*IntegrationTest"/>
+        <Bug pattern="DMI_HARDCODED_ABSOLUTE_FILENAME"/>
+    </Match>
+
+</FindBugsFilter>

@@ -1,0 +1,24 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: allica-test-webflux
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    default-property-inclusion: non_null
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${AUTH_SERVER_URL:http://localhost:9000}/oauth2/jwks
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+security:
+  allowed-origins: http://localhost:3000

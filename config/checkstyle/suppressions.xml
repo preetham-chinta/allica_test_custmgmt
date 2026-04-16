@@ -1,0 +1,51 @@
+<?xml version="1.0"?>
+<!DOCTYPE suppressions PUBLIC
+    "-//Checkstyle//DTD SuppressionFilter Configuration 1.2//EN"
+    "https://checkstyle.org/dtds/suppressions_1_2.dtd">
+
+<!--
+  Suppressions — per-file or per-check exclusions.
+
+  Pattern tips:
+    - files="" uses regex against the full file path
+    - checks="" uses regex against the check module name
+    - lines="" suppresses only on specific lines
+
+  Categories of suppression here:
+    1. Generated code  — DTOs, builders that Lombok generates — skip naming/javadoc
+    2. Application entry point — main class needs different rules
+    3. Configuration classes — Spring @Configuration verbosity is expected
+    4. Exception classes — minimal, intentionally short
+    5. Test code — test methods can be long and verbose
+-->
+<suppressions>
+
+    <!-- Application entry point — public static void main doesn't need javadoc -->
+    <suppress files="Application\.java" checks=".*"/>
+
+    <!-- Lombok-annotated DTOs — generated getters/builders need no javadoc -->
+    <suppress files=".*DTO\.java"    checks="JavadocMethod|JavadocVariable|MissingJavadocMethod"/>
+    <suppress files=".*Request\.java" checks="JavadocMethod|JavadocVariable|MissingJavadocMethod"/>
+    <suppress files=".*Response\.java" checks="JavadocMethod|JavadocVariable|MissingJavadocMethod"/>
+
+    <!-- Exception classes are intentionally short -->
+    <suppress files=".*Exception\.java" checks="MethodLength|DesignForExtension"/>
+
+    <!-- Security config — Spring DSL is inherently verbose -->
+    <suppress files=".*SecurityConfig\.java" checks="MethodLength"/>
+    <suppress files=".*SecurityConfig\.java" checks="DesignForExtension"/>
+
+    <!-- Router/config classes — lambda chaining can be long -->
+    <suppress files=".*Router\.java"  checks="MethodLength"/>
+    <suppress files=".*Config\.java"  checks="MethodLength"/>
+    <suppress files=".*Config\.java"  checks="DesignForExtension"/>
+
+    <!-- Flyway migration scripts (if any .java migrations added later) -->
+    <suppress files="db[/\\]migration" checks=".*"/>
+
+    <!-- Test classes — verbosity is acceptable in tests -->
+    <suppress files=".*Test\.java"  checks="MethodLength|JavadocMethod|MagicNumber|LineLength"/>
+    <suppress files=".*IT\.java"    checks="MethodLength|JavadocMethod|MagicNumber|LineLength"/>
+    <suppress files=".*Tests\.java" checks="MethodLength|JavadocMethod|MagicNumber|LineLength"/>
+
+</suppressions>

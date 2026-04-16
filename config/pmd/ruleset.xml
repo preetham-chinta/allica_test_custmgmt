@@ -1,0 +1,57 @@
+<?xml version="1.0"?>
+<ruleset name="Allica Test PMD Ruleset"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0
+             https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+
+    <description>
+        Curated PMD ruleset for Spring Boot microservices.
+        Philosophy: high signal, low noise.
+        Excluded categories:
+          - design (too opinionated for enterprise Spring code — @Service classes are large by design)
+          - codestyle (checkstyle handles this)
+          - documentation (javadoc covered elsewhere)
+        Included categories with exceptions:
+          - bestpractices (minus Spring-incompatible rules)
+          - errorprone (minus false positives)
+          - performance (all included — no exceptions)
+          - multithreading (all included — reactive code must be thread-safe)
+    </description>
+
+    <!-- ── Best practices ────────────────────────────────────────────────── -->
+    <rule ref="category/java/bestpractices.xml">
+        <!-- Spring uses field injection in tests — acceptable with @Autowired -->
+        <exclude name="JUnit4TestShouldUseTestAnnotation"/>
+        <!-- JUnit 5 parameterized tests — PMD can't always infer the runner -->
+        <exclude name="JUnitTestContainsTooManyAsserts"/>
+        <!-- Spring @Bean methods need protected for CGLib proxying -->
+        <exclude name="AccessorMethodGeneration"/>
+        <!-- Lombok @Builder generates these -->
+        <exclude name="UseTryWithResources"/>
+    </rule>
+
+    <!-- ── Error prone ───────────────────────────────────────────────────── -->
+    <rule ref="category/java/errorprone.xml">
+        <!-- Spring uses DataAccessException hierarchy — BrokenNullCheck false positives -->
+        <exclude name="BeanMembersShouldSerialize"/>
+        <!-- Lombok generates equals/hashCode — PMD doesn't see it -->
+        <exclude name="OverrideBothEqualsAndHashcode"/>
+        <!-- Log4j not used — PMD's detection is imprecise -->
+        <exclude name="MoreThanOneLogger"/>
+        <!-- Spring @Configuration class calling @Bean methods is intentional -->
+        <exclude name="TestClassWithoutTestCases"/>
+        <!-- Null assignments are valid in Spring lifecycle methods -->
+        <exclude name="NullAssignment"/>
+    </rule>
+
+    <!-- ── Performance ───────────────────────────────────────────────────── -->
+    <rule ref="category/java/performance.xml"/>
+
+    <!-- ── Multithreading ────────────────────────────────────────────────── -->
+    <rule ref="category/java/multithreading.xml">
+        <!-- Project Reactor handles synchronisation — not Java primitives -->
+        <exclude name="UseConcurrentHashMap"/>
+    </rule>
+
+</ruleset>

@@ -1,0 +1,31 @@
+# ─── DEV / DEMO profile ────────────────────────────────────────────────────────
+# All API endpoints are open — no token required (see SecurityConfig @Profile("dev"))
+# Run: ./gradlew bootRun --args='--spring.profiles.active=dev'
+
+spring:
+  datasource:
+    url: jdbc:h2:mem:allicatest;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  h2.console.enabled: true            # Browse at http://localhost:8080/h2-console
+
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate.ddl-auto: validate      # Flyway owns the schema
+    show-sql: true
+    properties.hibernate.search:
+      backend.type: lucene
+      backend.directory.type: local-heap  # in-memory, no disk
+      schema-management.strategy: drop-and-create
+
+  flyway:
+    enabled: true
+    locations:
+      - classpath:db/migration
+      - classpath:db/migration/dev    # seed data (V3)
+
+logging:
+  level:
+    com.allicatest: DEBUG
+    org.hibernate.search: INFO
