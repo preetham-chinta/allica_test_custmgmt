@@ -13,7 +13,7 @@ import { useAuthStore }   from "@/store";
 /**
  * LoginPage — authentication entry point.
  *
- * DEV MODE (this POC):
+ * DEV MODE (this Technical Test):
  *   Uses a hardcoded dev token so the demo works without a real auth server.
  *   The token is signed with RS256 and includes customers:read + customers:write scopes.
  *   Resource servers in @Profile("dev") = permitAll, so no actual validation happens.

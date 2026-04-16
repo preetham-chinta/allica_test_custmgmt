@@ -1,5 +1,3 @@
-# AI Usage Documentation
-
 ## Tool used
 
 I used Claude as a coding agent, not to generate the project from scratch, but to implement decisions that is taken by me on the Technology choice, architectural pattern, and structural decision. All the code you see went through a human-in-the-loop. I reviewed every file before accepting it, questioned things that looked off, and in several cases explicitly asked Claude to undo or simplify something it had added.

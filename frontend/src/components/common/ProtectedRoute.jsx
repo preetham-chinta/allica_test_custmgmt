@@ -13,7 +13,7 @@ import { useAuthStore }           from "@/store";
  *   typically via a GET /api/auth/session call. The redirect to /login
  *   would instead trigger the OAuth2 Authorization Code flow.
  *
- * In this POC:
+ * In this Technical Test:
  *   isAuthed is true when a token has been set in the store.
  *   The dev login page sets a hardcoded token so the demo works
  *   without a real auth server running.

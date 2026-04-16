@@ -16,7 +16,7 @@ import { persist, createJSONStorage } from "zustand/middleware";
  *   - Next.js server holds the JWT in an encrypted server-side session
  *   - Browser gets an HttpOnly cookie — JS cannot read it
  *   - tokenStore.js is not needed — Next.js handles auth transparently
- *   - This in-memory approach is correct for a POC demo without Next.js
+ *   - This in-memory approach is correct for a Technical Test demo without Next.js
  *
  * Non-React access (HttpClient):
  *   useAuthStore.getState().token — same pattern as CustomerService
