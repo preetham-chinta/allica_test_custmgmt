@@ -1,4 +1,4 @@
-# Allica Bank - Customer Management Technical Test
+# Allica Bank - Technical Test
 
 This repository contains a high-performance, full-stack implementation for a modern Customer Management system. It is designed to demonstrate **Senior+ level architectural decisions**, featuring a dual-backend approach (Spring Boot MVC & WebFlux) and a modern React frontend.
 
